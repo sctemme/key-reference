@@ -49,13 +49,22 @@ LDLIBS_THREADED= $(XLDLIBS_THREADED) -lpthread -lrt $(LDLIBS)
 
 all: key-reference
 
-key-reference.o:
+XLDLIBS= $(LIBPATH_SWORLD)/libnfkm.a \
+	$(LIBPATH_HILIBS)/libnfstub.a \
+	$(LIBPATH_NFLOG)/libnflog.a \
+	$(LIBPATH_CUTILS)/libcutils.a
+
+COMMON_OBJECTS= simplebignum.o nfutil.o
+
+COMMON_HEADERS= $(SRCPATH)/simplebignum.h $(SRCPATH)/nfutil.h
+
+key-reference.o: key-reference.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o key-reference.o -c $(SRCPATH)/key-reference.c
 
 KEY-REFERENCE_OBJS= key-reference.o
 
-key-reference: key-reference.o
-	       $(LINK) $(LDFLAGS) -o key-reference $(KEY-REFERENCE_OBJS) $(LDLIBS)
+key-reference: key-reference.o $(COMMON_OBJECTS)
+	       $(LINK) $(LDFLAGS) -o key-reference $(KEY-REFERENCE_OBJS) $(COMMON_OBJECTS) $(LDLIBS)
 
 # Secondary targets ------------------------
 
