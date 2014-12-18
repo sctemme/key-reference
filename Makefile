@@ -37,7 +37,7 @@ CPPFLAGS=	   -I$(SRCPATH) \
 		-I$(EXAMPLES_NFLOG) \
 		-I$(EXAMPLES_CUTILS) \
 		$(XCPPFLAGS)
-CFLAGS=		-g -O2  -Wall -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-format-zero-length -D_GNU_SOURCE -Wno-nonnull -Werror -O2    -fPIC -Wno-nonnull  $(XCFLAGS)
+CFLAGS=		-g -O0  -Wall -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-format-zero-length -D_GNU_SOURCE -Wno-nonnull -Werror -fPIC -Wno-nonnull  $(XCFLAGS)
 
 LINK=		  gcc
 LDFLAGS= 	   $(XLDFLAGS)
@@ -65,6 +65,15 @@ KEY-REFERENCE_OBJS= key-reference.o
 
 key-reference: key-reference.o $(COMMON_OBJECTS)
 	       $(LINK) $(LDFLAGS) -o key-reference $(KEY-REFERENCE_OBJS) $(COMMON_OBJECTS) $(LDLIBS)
+
+testosslbignum.o: testosslbignum.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o testosslbignum.o -c $(SRCPATH)/testosslbignum.c
+
+testosslbignum: testosslbignum.o osslbignum.o nfutil.o
+	$(LINK) $(LDFLAGS) -o testosslbignum testosslbignum.o osslbignum.o nfutil.o $(LDLIBS) -lssl -lcrypto
+
+runtest:
+	gdb -ex 'break osslbignum.c:11' -ex 'break osslbignum.c:46' -ex 'break osslbignum.c:57' -ex 'break osslbignum.c:91' -ex 'break osslbignum.c:102' -ex 'break testosslbignum.c:44' testosslbignum
 
 # Secondary targets ------------------------
 
