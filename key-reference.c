@@ -2,7 +2,7 @@
 #include <strings.h>
 
 #include <nfkm.h>
-#include "simplebignum.h"
+#include "osslbignum.h"
 
 #define BUGOUT(rc, text) if ((rc)) {			\
     NFast_Perror((text), (rc));				\
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
      as we find them necessary */
   bzero(&nfargs, sizeof(nfargs));
   nfargs.flags = NFAPP_IF_BIGNUM;
-  nfargs.bignumupcalls = &sbn_upcalls;
+  nfargs.bignumupcalls = &osslbn_upcalls;
 
   status = NFastApp_InitEx(&nfapp, &nfargs, NULL);
   BUGOUT(status, "error calling NFastApp_InitEx");

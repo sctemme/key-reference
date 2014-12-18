@@ -52,11 +52,12 @@ all: key-reference
 XLDLIBS= $(LIBPATH_SWORLD)/libnfkm.a \
 	$(LIBPATH_HILIBS)/libnfstub.a \
 	$(LIBPATH_NFLOG)/libnflog.a \
-	$(LIBPATH_CUTILS)/libcutils.a
+	$(LIBPATH_CUTILS)/libcutils.a \
+	-lcrypto
 
-COMMON_OBJECTS= simplebignum.o nfutil.o
+COMMON_OBJECTS= osslbignum.o nfutil.o
 
-COMMON_HEADERS= $(SRCPATH)/simplebignum.h $(SRCPATH)/nfutil.h
+COMMON_HEADERS= $(SRCPATH)/osslbignum.h $(SRCPATH)/nfutil.h
 
 key-reference.o: key-reference.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o key-reference.o -c $(SRCPATH)/key-reference.c
