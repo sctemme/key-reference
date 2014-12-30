@@ -26,6 +26,59 @@ static const char *hash2hex(const M_Hash *hash) {
 }
 */
 
+/* Make a tag of suitable length with the NFKM Hash of the key in it */
+BIGNUM *make_tag(struct NFast_Application *app,
+		 struct NFast_Call_Context *cctx,
+		 struct NFast_Transaction_Context *tctx,
+		 M_KeyHash *nfkmhash, int len);
+
+/* Identifier at the start of the tag.  Length should be 10. */
+#define TAG "NFKM Hash:"
+
+BIGNUM *make_tag(struct NFast_Application *app,
+		 struct NFast_Call_Context *cctx,
+		 struct NFast_Transaction_Context *tctx,
+		 M_KeyHash *nfkmhash, int len) {
+  BIGNUM *bn = NULL;
+  const unsigned char *buf;
+  unsigned char *pos;
+  int chars;
+
+  /* Length must be a multiple of 4 */
+  if ((len & 3) != 0) return NULL;
+  /* Leading tag is 11 bytes including trailing \0 left by sprintf.
+     NFKM Hash is 20 bytes.  Let's add a trailing \0 after the NFKM
+     hash.  This means our minimum length is 32 bytes. */
+  if (len < 32) return NULL;
+
+  buf = (const unsigned char *)NFastApp_Malloc(app, len, cctx, tctx);
+  if (buf == NULL) return NULL;
+  /* Mutable copy of buf, and the pointer we will use to poke values
+     into the buffer */
+  pos = (unsigned char *)buf;
+
+  /* Whimsy: set all bytes to 42 (0x2a, which is the universal Answer to the
+     question of Life, the Universe, and Everything) so the unused
+     ones are easily distinguished. */
+  memset(pos, 42, len);
+
+  chars = sprintf((char *)pos, TAG);
+  if (chars == 0) return NULL;
+  pos += chars;
+  ++pos; /* Skip the trailing \0 of the tag string. */
+
+  /* Hardcoding the length of the NFKM Hash construct to 20: this is
+     safe (safer than a potential buffer overrun). */
+  memcpy(pos, nfkmhash->bytes, 20);
+  pos += 20;
+  *pos = 0; /* Trailing zero after the NFKM Hash */
+
+  /* Now stuff the result into a BIGNUM */
+  bn = BN_bin2bn(buf, len, bn);
+
+  return bn;
+}
+
 int main(int argc, char *argv[])
 {
   NFast_AppHandle nfapp;
@@ -39,10 +92,12 @@ int main(int argc, char *argv[])
   M_Command cmd;
   M_Reply reply;
   M_KeyType keytype;
-  /* M_Word keylength; */
-  /* M_KeyHash keyhash; */
+  M_Word keylength;
+  M_KeyHash keyhash;
   int status;
   EVP_PKEY *pkey;
+  RSA *rsa;
+  BIGNUM *tag;
   FILE *outfile = NULL;
   char *errstr;
 
@@ -110,8 +165,8 @@ int main(int argc, char *argv[])
   BUGOUT(status, "error getting key information");
   BUGOUT(reply.status, "error in key information");
   keytype = reply.reply.getkeyinfoex.type;
-  /* keylength = reply.reply.getkeyinfoex.length; */
-  /* keyhash = reply.reply.getkeyinfoex.hash; */
+  keylength = reply.reply.getkeyinfoex.length;
+  keyhash = reply.reply.getkeyinfoex.hash;
 
   /* Now get the public key data */
   bzero(&cmd, sizeof(cmd));
@@ -130,6 +185,33 @@ int main(int argc, char *argv[])
 
   switch (keytype) {
   case KeyType_RSAPublic:
+    rsa = RSA_new();
+    /* Assign the appropriate key values: n, e and a dummy d. */
+    rsa->n = reply.reply.export.data.data.rsapublic.n->bn;
+    rsa->e = reply.reply.export.data.data.rsapublic.e->bn;
+    /* The private exponent length is half the key modulus
+       size. Passing in bytes not bits. */
+    tag = make_tag(nfapp, NULL, NULL, &keyhash, keylength / (2*8));
+    rsa->d = tag;
+    /* Contrary to RSA(3) documentation, openssl rsa won't read the
+       PEM file unless p is set.  Set it to the key modulus just like
+       the embedsavefile does. */
+    rsa->p = reply.reply.export.data.data.rsapublic.n->bn;
+    /* Same for q: set to 1 just like the embedsavefile. Note this
+       utility function returns a const BIGNUM * but I don't think we
+       will attempt to change its value so discarding the constness
+       should be safe.  */
+    rsa->q = (BIGNUM *)BN_value_one();
+    rsa->dmp1 = (BIGNUM *)BN_value_one();
+    rsa->dmq1 = (BIGNUM *)BN_value_one();
+    /* Finally set the coefficient value to the tag */
+    rsa->iqmp = tag;
+    status = EVP_PKEY_assign_RSA(pkey, rsa);
+    if (status == 0) {
+      fprintf(stderr, "Error assigning RSA key.\n");
+      goto cleanup;
+    }
+    break;
   case KeyType_DSAPublic:
   case KeyType_ECPublic:
   case KeyType_ECDSAPublic:
