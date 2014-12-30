@@ -1,5 +1,9 @@
+#include <errno.h>
 #include <string.h>
 #include <strings.h>
+
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 
 #include <nfkm.h>
 #include "osslbignum.h"
@@ -9,6 +13,7 @@
     goto cleanup;					\
   }
 
+/*
 static const char *hash2hex(const M_Hash *hash) {
   static char buf[sizeof(hash->bytes)*2+1];
 
@@ -19,6 +24,7 @@ static const char *hash2hex(const M_Hash *hash) {
     sprintf(p, "%02x", hash->bytes[i]);
   return buf;
 }
+*/
 
 int main(int argc, char *argv[])
 {
@@ -33,9 +39,12 @@ int main(int argc, char *argv[])
   M_Command cmd;
   M_Reply reply;
   M_KeyType keytype;
-  M_Word keylength;
-  M_KeyHash keyhash;
+  /* M_Word keylength; */
+  /* M_KeyHash keyhash; */
   int status;
+  EVP_PKEY *pkey;
+  FILE *outfile = NULL;
+  char *errstr;
 
   /* We need two arguments: key appname and ident. Without both we
      cannot proceed. */
@@ -101,8 +110,8 @@ int main(int argc, char *argv[])
   BUGOUT(status, "error getting key information");
   BUGOUT(reply.status, "error in key information");
   keytype = reply.reply.getkeyinfoex.type;
-  keylength = reply.reply.getkeyinfoex.length;
-  keyhash = reply.reply.getkeyinfoex.hash;
+  /* keylength = reply.reply.getkeyinfoex.length; */
+  /* keyhash = reply.reply.getkeyinfoex.hash; */
 
   /* Now get the public key data */
   bzero(&cmd, sizeof(cmd));
@@ -117,9 +126,42 @@ int main(int argc, char *argv[])
      different depending on key type.  Of course the same applies to
      what we will need to do with the key data in OpenSSL. */
 
-  fprintf(stdout, "Key type is %s\n", NF_Lookup(keytype, NF_KeyType_enumtable));
-  fprintf(stdout, "Key length is %d\n", keylength);
-  fprintf(stdout, "Key hash is %s\n", hash2hex(&keyhash));
+  pkey = EVP_PKEY_new();
+
+  switch (keytype) {
+  case KeyType_RSAPublic:
+  case KeyType_DSAPublic:
+  case KeyType_ECPublic:
+  case KeyType_ECDSAPublic:
+  default:
+    fprintf(stderr, "Unsupported key type: %s\n",
+	    NF_Lookup(keytype, NF_KeyType_enumtable));
+    goto cleanup;
+  }
+
+  /* TODO Hardcode the file name for now, should be command line parameter */
+  outfile = fopen("privatekey.pem", "w");
+  if (outfile == NULL) {
+    errstr = strerror(errno);
+    fprintf(stderr, "Error opening output file for writing: %s\n", errstr);
+    goto cleanup;
+  }
+  status = PEM_write_PKCS8PrivateKey(outfile, pkey, NULL, NULL, 0, NULL, NULL);
+  if (status == 0) {
+    /* Unlike everywhere else on the system, OpenSSL uses 1 for
+       success and 0 for errors.  TODO embellish this with OpenSSL
+       error tracking.  */
+    fprintf(stderr, "Error writing output file\n");
+    goto cleanup;
+  }
+
+  status = fclose(outfile);
+  if (status != 0) {
+    errstr = strerror(errno);
+    fprintf(stderr, "Error closing output file: %s\n", errstr);
+    goto cleanup;
+  }
+
   return 0;
 
  cleanup:
@@ -128,5 +170,10 @@ int main(int argc, char *argv[])
      the bottom of the main() function, we don't need to clean up
      anything.  If this code is pasted into some other context, we
      will. */
+  if (outfile) {
+    /* Ignore int result b/c we're done. */
+    fclose(outfile);
+  }
+
   return 1;
 }
