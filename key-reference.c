@@ -8,9 +8,9 @@
 #include <nfkm.h>
 #include "osslbignum.h"
 
-#define BUGOUT(rc, text) if ((rc)) {			\
-    NFast_Perror((text), (rc));				\
-    goto cleanup;					\
+#define BUGOUT(rc, text) if ((rc)) {		\
+    NFast_Perror((text), (rc));			\
+    goto cleanup;				\
   }
 
 /*
@@ -131,15 +131,15 @@ int main(int argc, char *argv[])
   BUGOUT(status, "error calling NFKM_findkey");
 
   if (!keyinfo) {
-  fprintf(stderr, "Key does not exist:\napp: %s ident: %s\n",
-    keyident.appname, keyident.ident);
-  goto cleanup;
-}
+    fprintf(stderr, "Key does not exist:\napp: %s ident: %s\n",
+	    keyident.appname, keyident.ident);
+    goto cleanup;
+  }
   if (!keyinfo->pubblob.len) {
-  /* Nefarious caller tried to slip us a symmetric key with no public blob */
-  fprintf(stderr, "Key does not have a public half!\n");
-  goto cleanup;
-}
+    /* Nefarious caller tried to slip us a symmetric key with no public blob */
+    fprintf(stderr, "Key does not have a public half!\n");
+    goto cleanup;
+  }
 
   /* Now find a suitable module to load the key onto.  We don't care
      which of our modules gets to do this, as long as it's Usable */
@@ -147,12 +147,12 @@ int main(int argc, char *argv[])
   BUGOUT(status, "error finding Usable module");
 
   status = NFKM_cmd_loadblob(nfapp, nfconn,
-    moduleinfo->module,
-    &keyinfo->pubblob,
-    0,
-    &keyid,
-    "loading public key blob",
-    NULL);
+			     moduleinfo->module,
+			     &keyinfo->pubblob,
+			     0,
+			     &keyid,
+			     "loading public key blob",
+			     NULL);
   BUGOUT(status, "error loading public key");
 
   /* There is no NFKM function for GetKeyInfoEx, so we have to drop
