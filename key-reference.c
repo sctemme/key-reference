@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
   int status;
   EVP_PKEY *pkey;
   RSA *rsa;
+  DSA *dsa;
   BIGNUM *tag;
   FILE *outfile = NULL;
   char *errstr;
@@ -213,6 +214,22 @@ int main(int argc, char *argv[])
     }
     break;
   case KeyType_DSAPublic:
+    dsa = DSA_new();
+    /* This is pretty straightforward */
+    dsa->p = reply.reply.export.data.data.dsapublic.dlg.p->bn;
+    dsa->q = reply.reply.export.data.data.dsapublic.dlg.q->bn;
+    dsa->g = reply.reply.export.data.data.dsapublic.dlg.g->bn;
+    /* Private key value is same lenght as the key, but of course we
+       have to specify bytes not bits. */
+    tag = make_tag(nfapp, NULL, NULL, &keyhash, keylength / 8);
+    dsa->priv_key = tag;
+    dsa->pub_key = reply.reply.export.data.data.dsapublic.y->bn;
+    status = EVP_PKEY_assign_DSA(pkey, dsa);
+    if (status == 0) {
+      fprintf(stderr, "Error assigning DSA key.\n");
+      goto cleanup;
+    }
+    break;
   case KeyType_ECPublic:
   case KeyType_ECDSAPublic:
   default:
