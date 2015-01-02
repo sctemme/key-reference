@@ -2,6 +2,7 @@
 #include <string.h>
 #include <strings.h>
 
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
@@ -25,6 +26,23 @@ static const char *hash2hex(const M_Hash *hash) {
   return buf;
 }
 */
+
+/* Print the OpenSSL error stack to stderr */
+void ossl_print_errors(void);
+
+void ossl_print_errors(void)
+{
+  unsigned long error;
+  char errorstring[120];
+  char *displaystr = NULL;
+
+  ERR_load_crypto_strings();
+
+  while ((error = ERR_get_error()) != 0) {
+    displaystr = ERR_error_string(error, errorstring);
+    fprintf(stderr, "%s\n", displaystr);
+  }
+}
 
 /* Make a tag of suitable length with the NFKM Hash of the key in it */
 BIGNUM *make_tag(struct NFast_Application *app,
@@ -98,6 +116,11 @@ int main(int argc, char *argv[])
   EVP_PKEY *pkey;
   RSA *rsa;
   DSA *dsa;
+  EC_KEY *ec;
+  EC_GROUP *ecgroup;
+  M_ECPoint mpublic;
+  EC_POINT *ecpublic;
+  BN_CTX *bnctx;
   BIGNUM *tag;
   FILE *outfile = NULL;
   char *errstr;
@@ -183,6 +206,10 @@ int main(int argc, char *argv[])
      what we will need to do with the key data in OpenSSL. */
 
   pkey = EVP_PKEY_new();
+  if (pkey == NULL) {
+    ossl_print_errors();
+    goto cleanup;
+  }
 
   switch (keytype) {
   case KeyType_RSAPublic:
@@ -210,6 +237,7 @@ int main(int argc, char *argv[])
     status = EVP_PKEY_assign_RSA(pkey, rsa);
     if (status == 0) {
       fprintf(stderr, "Error assigning RSA key.\n");
+      ossl_print_errors();
       goto cleanup;
     }
     break;
@@ -227,11 +255,91 @@ int main(int argc, char *argv[])
     status = EVP_PKEY_assign_DSA(pkey, dsa);
     if (status == 0) {
       fprintf(stderr, "Error assigning DSA key.\n");
+      ossl_print_errors();
       goto cleanup;
     }
     break;
   case KeyType_ECPublic:
   case KeyType_ECDSAPublic:
+    ec = EC_KEY_new();
+    switch (reply.reply.export.data.data.ecpublic.curve.name) {
+      /* It appears Red Hat strips out most Named Curves from their
+	 system-provided OpenSSL.  NISTP256 happens to be one they
+	 still have (as prime256v1), so we can support that.  Others
+	 will likely require redefinition of the named curve in our
+	 code since nCore does not supply parameter values for named
+	 curves. */
+    case ECName_NISTP256:
+      ecgroup = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+      if (ecgroup == NULL) {
+	fprintf(stderr, "Error obtaining EC Group\n");
+	ossl_print_errors();
+	goto cleanup;
+      }
+      break;
+    default:
+      fprintf(stderr, "Unsupported Elliptic Curve: %s\n",
+	      NF_Lookup(reply.reply.export.data.data.ecpublic.curve.name,
+			NF_ECName_enumtable));
+      goto cleanup;
+    }
+    status = EC_KEY_set_group(ec, ecgroup);
+    if (status == 0) {
+      fprintf(stderr, "Error assigning Group to EC Key\n");
+      ossl_print_errors();
+      goto cleanup;
+    }
+
+    /* Set the private key value */
+    tag = make_tag(nfapp, NULL, NULL, &keyhash, keylength / 8);
+    status = EC_KEY_set_private_key(ec, (const BIGNUM *)tag);
+    if (status == 0) {
+      fprintf(stderr, "Error setting EC private key value\n");
+      ossl_print_errors();
+      goto cleanup;
+    }
+    /* Construct the public key and set it */
+    mpublic = reply.reply.export.data.data.ecpublic.Q;
+    ecpublic = EC_POINT_new((const EC_GROUP *)ecgroup);
+    if (mpublic.flags & ECPoint_flags_Infinity) {
+      /* I don't know if key points are ever at Infinity. */
+      status = EC_POINT_set_to_infinity((const EC_GROUP *)ecgroup,
+					ecpublic);
+      if (status == 0) {
+	fprintf(stderr, "Error setting Public Key point to infinity\n");
+	ossl_print_errors();
+	goto cleanup;
+      }
+    } else {
+      /* TODO once we support non-primary curves, we need to
+	 distinguish the curve type here and call the right assignment
+	 function */
+      bnctx = BN_CTX_new();
+      status = EC_POINT_set_affine_coordinates_GFp((const EC_GROUP *)ecgroup,
+						   ecpublic,
+						   mpublic.x->bn,
+						   mpublic.y->bn,
+						   bnctx);
+      if (status == 0) {
+	fprintf(stderr, "Error setting public key point coordinates\n");
+	ossl_print_errors();
+	goto cleanup;
+      }
+    }
+    status = EC_KEY_set_public_key(ec, (const EC_POINT *)ecpublic);
+    if (status == 0) {
+      fprintf(stderr, "Error setting public key\n");
+      ossl_print_errors();
+      goto cleanup;
+    }
+
+    status = EVP_PKEY_assign_EC_KEY(pkey, ec);
+    if (status == 0) {
+      fprintf(stderr, "Error assigning EC key.\n");
+      ossl_print_errors();
+      goto cleanup;
+    }
+    break;
   default:
     fprintf(stderr, "Unsupported key type: %s\n",
 	    NF_Lookup(keytype, NF_KeyType_enumtable));
@@ -251,6 +359,7 @@ int main(int argc, char *argv[])
        success and 0 for errors.  TODO embellish this with OpenSSL
        error tracking.  */
     fprintf(stderr, "Error writing output file\n");
+    ossl_print_errors();
     goto cleanup;
   }
 
