@@ -371,8 +371,7 @@ int main(int argc, char *argv[])
   status = PEM_write_PKCS8PrivateKey(outfile, pkey, NULL, NULL, 0, NULL, NULL);
   if (status == 0) {
     /* Unlike everywhere else on the system, OpenSSL uses 1 for
-       success and 0 for errors.  TODO embellish this with OpenSSL
-       error tracking.  */
+       success and 0 for errors. */
     fprintf(stderr, "Error writing output file\n");
     ossl_print_errors();
     goto cleanup;
