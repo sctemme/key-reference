@@ -264,11 +264,26 @@ int main(int argc, char *argv[])
     ec = EC_KEY_new();
     switch (reply.reply.export.data.data.ecpublic.curve.name) {
       /* It appears Red Hat strips out most Named Curves from their
-	 system-provided OpenSSL.  NISTP256 happens to be one they
-	 still have (as prime256v1), so we can support that.  Others
-	 will likely require redefinition of the named curve in our
-	 code since nCore does not supply parameter values for named
-	 curves. */
+       * system-provided OpenSSL.  The OpenSSL found in Fedora 18 only
+       * knows the following curves:
+       *
+       * openssl ecparam -list_curves
+       *   secp384r1 : NIST/SECG curve over a 384 bit prime field
+       *   secp521r1 : NIST/SECG curve over a 521 bit prime field
+       *   prime256v1: X9.62/SECG curve over a 256 bit prime field
+       *
+       * prime256v1 is the same as our NISTP256, so we can support
+       * that.  Others will likely require redefinition of the named
+       * curve in our code since nCore does not supply parameter
+       * values for named curves.
+       */
+
+      /* The generatekey utility supports for app type PKCS#11 and key
+	 type ECDSA the following curves: NISTP192, NISTP224,
+	 NISTP256, NISTP384, NISTP521, NISTB163, NISTB233, NISTB283,
+	 NISTB409, NISTB571, NISTK163, NISTK233, NISTK283, NISTK409,
+	 NISTK571, ANSIB163v1, ANSIB191v1, SECP160r1, CustomLCF.  Oh
+	 and the last one errors out... Oops generatekey. */
     case ECName_NISTP256:
       ecgroup = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
       if (ecgroup == NULL) {
