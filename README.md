@@ -41,6 +41,27 @@ as the public key data in the fake key files is real (if it's not,
 that's a bug in the program).  But the CKA_NFKM_ID attribute
 canonically identifies a key in the Thales Security World.
 
+Building
+--------
+
+The default target in the supplied Makefile will build the
+`key-reference` utility.
+
+The build uses the `ctd` package of the Thales CipherTools Development
+Kit.  
+
+### System Dependencies
+
+In addition to the default operating system installation, the
+following RPMs are needed on the system for the build:
+
+* git
+* openssl-devel
+* gcc
+* make
+
+__NOTE__: this may be a partial list: please add if you find yourself
+having to add packages to a new system!
 
 Limitations
 -----------
