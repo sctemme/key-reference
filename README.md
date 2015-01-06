@@ -21,6 +21,26 @@ key PEM file based on the public key information.  The private key
 value is set to the NFKM hash of the key, prepended with the tag "NFKM
 Hash:".
 
+### Decoding the Key Identifier
+
+For each key type, the appropriate value (Private Exponent for RSA,
+Private Key values for DSA and ECC) will have been set to the
+following sequence:
+
+    "NFKM Hash:" + \0 + <the NFKM Hash of the key> + \0 + the value 42
+    in all remaining bytes (if any).
+
+The NFKM Hash value of the key can be used by the Thales PKCS#11
+library in a `C_FindObjectsInit()` search template based on the
+`CKA_NFKM_ID` proprietary attribute defined in
+`/opt/nfast/c/ctd/gcc/include/pkcs11/pkcs11extra.h` in the CipherTools
+Developer Toolkit.
+
+Alternatively, one can use any public key value to search for the key
+as the public key data in the fake key files is real (if it's not,
+that's a bug in the program).  But the CKA_NFKM_ID attribute
+canonically identifies a key in the Thales Security World.
+
 
 Limitations
 -----------
@@ -28,6 +48,10 @@ Limitations
 The dummy key file is currently hardcoded to _privatekey.pem_.
 Turning this into a command line parameter is left as an exercise for
 the reader.
+
+The minimum length of the private key value we can support is 32 bytes
+as the data structure defined above takes up that much space.  This
+may or may not be a limitation when it comes to key and curve support.
 
 Currently only NISTP256 keys are supported: other ECC curves may have
 to be defined in the source code as I don't think nCore has a way to
