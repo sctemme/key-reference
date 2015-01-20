@@ -6,11 +6,11 @@ Usage
 
 Invoke thusly:
 
-    key-reference <appname> <ident>
+    key-reference <appname> <ident> <outfilename>
 
 For example:
 
-    key-reference pkcs11 uaf0c15504eff737138a32527be52cf97ae50118a8
+    key-reference pkcs11 uaf0c15504eff737138a32527be52cf97ae50118a8 outfile.pem
 
 Purpose
 -------
@@ -65,10 +65,6 @@ having to add packages to a new system!
 
 Limitations
 -----------
-
-The dummy key file is currently hardcoded to _privatekey.pem_.
-Turning this into a command line parameter is left as an exercise for
-the reader.
 
 The minimum length of the private key value we can support is 32 bytes
 as the data structure defined above takes up that much space.  This

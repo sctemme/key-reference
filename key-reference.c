@@ -122,17 +122,19 @@ int main(int argc, char *argv[])
   EC_POINT *ecpublic;
   BN_CTX *bnctx;
   BIGNUM *tag;
+  char *outname;
   FILE *outfile = NULL;
   char *errstr;
 
   /* We need two arguments: key appname and ident. Without both we
      cannot proceed. */
-  if (argc != 3) {
-    fprintf(stderr, "Usage: %s appname ident\n", argv[0]);
+  if (argc != 4) {
+    fprintf(stderr, "Usage: %s appname ident outfilename\n", argv[0]);
     goto cleanup;
   }
   keyident.appname = argv[1];
   keyident.ident = argv[2];
+  outname = argv[3];
 
   /* For now, zero out the entire args structure.  We will add upcalls
      as we find them necessary */
@@ -361,8 +363,7 @@ int main(int argc, char *argv[])
     goto cleanup;
   }
 
-  /* TODO Hardcode the file name for now, should be command line parameter */
-  outfile = fopen("privatekey.pem", "w");
+  outfile = fopen(outname, "w");
   if (outfile == NULL) {
     errstr = strerror(errno);
     fprintf(stderr, "Error opening output file for writing: %s\n", errstr);
