@@ -318,6 +318,14 @@ int main(int argc, char *argv[])
 	goto cleanup;
       }
       break;
+    case ECName_NISTP384:
+      ecgroup = EC_GROUP_new_by_curve_name(NID_secp384r1);
+      if (ecgroup == NULL) {
+	fprintf(stderr, "Error obtaining EC Group\n");
+	ossl_print_errors();
+	goto cleanup;
+      }
+      break;
     default:
       fprintf(stderr, "Unsupported Elliptic Curve: %s\n",
 	      NF_Lookup(reply.reply.export.data.data.ecpublic.curve.name,
