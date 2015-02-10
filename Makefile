@@ -55,9 +55,9 @@ XLDLIBS= $(LIBPATH_SWORLD)/libnfkm.a \
 	$(LIBPATH_CUTILS)/libcutils.a \
 	-lcrypto
 
-COMMON_OBJECTS= osslbignum.o nfutil.o
+COMMON_OBJECTS= osslbignum.o
 
-COMMON_HEADERS= $(SRCPATH)/osslbignum.h $(SRCPATH)/nfutil.h
+COMMON_HEADERS= $(SRCPATH)/osslbignum.h
 
 key-reference.o: key-reference.c $(COMMON_HEADERS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o key-reference.o -c $(SRCPATH)/key-reference.c
@@ -70,8 +70,8 @@ key-reference: key-reference.o $(COMMON_OBJECTS)
 testosslbignum.o: testosslbignum.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o testosslbignum.o -c $(SRCPATH)/testosslbignum.c
 
-testosslbignum: testosslbignum.o osslbignum.o nfutil.o
-	$(LINK) $(LDFLAGS) -o testosslbignum testosslbignum.o osslbignum.o nfutil.o $(LDLIBS) -lssl -lcrypto
+testosslbignum: testosslbignum.o osslbignum.o
+	$(LINK) $(LDFLAGS) -o testosslbignum testosslbignum.o osslbignum.o $(LDLIBS) -lssl -lcrypto
 
 runtest:
 	gdb -ex 'break osslbignum.c:11' -ex 'break osslbignum.c:46' -ex 'break osslbignum.c:57' -ex 'break osslbignum.c:91' -ex 'break osslbignum.c:102' -ex 'break testosslbignum.c:44' testosslbignum

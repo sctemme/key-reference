@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
   DSA *dsa;
   EC_KEY *ec;
   EC_GROUP *ecgroup;
+  int flag = 0;
   M_ECPoint mpublic;
   EC_POINT *ecpublic;
   BN_CTX *bnctx;
@@ -317,6 +318,7 @@ int main(int argc, char *argv[])
 	ossl_print_errors();
 	goto cleanup;
       }
+      flag = OPENSSL_EC_NAMED_CURVE;
       break;
     case ECName_NISTP384:
       ecgroup = EC_GROUP_new_by_curve_name(NID_secp384r1);
@@ -325,6 +327,7 @@ int main(int argc, char *argv[])
 	ossl_print_errors();
 	goto cleanup;
       }
+      flag = OPENSSL_EC_NAMED_CURVE;
       break;
     default:
       fprintf(stderr, "Unsupported Elliptic Curve: %s\n",
@@ -332,6 +335,8 @@ int main(int argc, char *argv[])
 			NF_ECName_enumtable));
       goto cleanup;
     }
+    if(flag != 0)
+      EC_GROUP_set_asn1_flag(ecgroup, flag);
     status = EC_KEY_set_group(ec, ecgroup);
     if (status == 0) {
       fprintf(stderr, "Error assigning Group to EC Key\n");

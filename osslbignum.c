@@ -22,8 +22,18 @@
  * THE SOFTWARE.
  */
 
+#include <string.h>
+
 #include "osslbignum.h"
-#include "nfutil.h"
+
+/* Helper function to copy data with option to change endianness and
+   word order. */
+int copy_swap_bytes ( unsigned char *dest,
+		      const unsigned char *source,
+		      unsigned numbytes,
+		      int endianchange,
+		      int wordswap );
+
 
 int osslbn_bignumreceiveupcall(struct NFast_Application *app,
 			       struct NFast_Call_Context *cctx,
@@ -53,8 +63,8 @@ int osslbn_bignumreceiveupcall(struct NFast_Application *app,
    * words. If mswordfirst == 0, we do.  If msbitfirst is already !0,
    * we do not have to swap the bytes.  If msbitfirst == 0, we do.
    */
-  nfutil_copybytes(buf, (const unsigned char *)source, nbytes,
-	      mswordfirst == 0 ? 1 : 0, msbitfirst == 0 ? 1 : 0);
+  copy_swap_bytes(buf, (const unsigned char *)source, nbytes,
+		  mswordfirst == 0 ? 1 : 0, msbitfirst == 0 ? 1 : 0);
   BN->bn = BN_bin2bn(buf, nbytes, NULL);
   /* Free buf as the previous call made a copy. */
   NFastApp_Free(app, (void *)buf, cctx, tctx);
@@ -80,6 +90,7 @@ int osslbn_bignumsendupcall(struct NFast_Application *app,
 			    void *dest, int msbitfirst, int mswordfirst)
 {
   int copied;
+  int status = Status_OK;
   struct NFast_Bignum *BN = *bignum;
   unsigned char *buf;
 
@@ -101,11 +112,11 @@ int osslbn_bignumsendupcall(struct NFast_Application *app,
   /* Internal storage is big-Endian. If the msbitfirst resp.
      mswordfirst are TRUE, no transformation.  If either are FALSE,
      apply that transformation. */
-  nfutil_copybytes(dest, (const unsigned char *)buf, nbytes,
-		   msbitfirst == 0 ? 1 : 0,
-		   mswordfirst == 0 ? 1 : 0);
-  
-  return Status_OK;
+  status = copy_swap_bytes(dest, (const unsigned char *)buf, nbytes,
+			   msbitfirst == 0 ? 1 : 0,
+			   mswordfirst == 0 ? 1 : 0);
+
+  return status;
 }
 
 void osslbn_bignumfreeupcall(struct NFast_Application *app,
@@ -137,3 +148,60 @@ NFast_BignumUpcalls osslbn_upcalls = {
   osslbn_bignumfreeupcall, /* NFast_BignumFreeUpcall_t */
   osslbn_bignumformatupcall  /* NFast_BignumFormatUpcall_t */
 };
+
+/*
+ * Copies source to dest, swapping endianness and/or word order. dest
+ * and source must not overlap!
+ */
+
+int copy_swap_bytes ( unsigned char *dest,
+		      const unsigned char *source,
+		      unsigned numbytes,
+		      int endianchange,
+		      int wordswap )
+{
+  int step;
+  unsigned numwords;
+
+  /* Must be whole number of four byte words. */
+  if ( (numbytes & 3) != 0 )
+    return Status_InvalidParameter;
+
+  /* If we don't have to change any ordering, just let the C library
+     memcpy(3) take care of it. */
+  if ( (endianchange == 0) && (wordswap == 0) ) {
+    memcpy(dest, source, numbytes);
+    return Status_OK;
+  }
+
+  if ( wordswap != 0 ) {
+    dest += (numbytes - 4);
+    step = -4;
+  } else {
+    step = 4;
+  }
+
+  numwords = numbytes >> 2;
+
+  if ( endianchange != 0) {
+    while ( numwords-- > 0 ) {
+      dest[0]=source[3];
+      dest[1]=source[2];
+      dest[2]=source[1];
+      dest[3]=source[0];
+      dest += step;
+      source += 4;
+    }
+  } else {
+    while ( numwords-- > 0 ) {
+      dest[0]=source[0];
+      dest[1]=source[1];
+      dest[2]=source[2];
+      dest[3]=source[3];
+      dest += step;
+      source += 4;
+    }
+  }
+
+  return Status_OK;
+}
